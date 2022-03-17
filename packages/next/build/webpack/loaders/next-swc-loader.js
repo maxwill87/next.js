@@ -88,7 +88,13 @@ async function loaderTransform(parentTrace, source, inputSourceMap) {
   const swcSpan = parentTrace.traceChild('next-swc-transform')
   return swcSpan.traceAsyncFn(() =>
     transform(source, programmaticOptions).then((output) => {
-      return [output.code, output.map ? JSON.parse(output.map) : undefined]
+      return [
+        output.code,
+        output.map ? JSON.parse(output.map) : undefined,
+        output.eliminatedPackages
+          ? JSON.parse(output.eliminatedPackages)
+          : undefined,
+      ]
     })
   )
 }
@@ -123,13 +129,17 @@ export function pitch() {
 
 export default function swcLoader(inputSource, inputSourceMap) {
   const loaderSpan = this.currentTraceSpan.traceChild('next-swc-loader')
+  const globalEliminatedPackages = this.eliminatedPackages
   const callback = this.async()
   loaderSpan
     .traceAsyncFn(() =>
       loaderTransform.call(this, loaderSpan, inputSource, inputSourceMap)
     )
     .then(
-      ([transformedSource, outputSourceMap]) => {
+      ([transformedSource, outputSourceMap, eliminatedPackages]) => {
+        if (eliminatedPackages) {
+          globalEliminatedPackages.push(...eliminatedPackages)
+        }
         callback(null, transformedSource, outputSourceMap || inputSourceMap)
       },
       (err) => {

@@ -1,4 +1,7 @@
-import type { webpack5 as webpack } from 'next/dist/compiled/webpack/webpack'
+import {
+  NormalModule,
+  webpack5 as webpack,
+} from 'next/dist/compiled/webpack/webpack'
 
 type Feature =
   | 'next/image'
@@ -54,6 +57,8 @@ const BUILD_FEATURES: Array<Feature> = [
   'swcEmotion',
 ]
 
+const ELIMINATED_PACKAGES: string[] = []
+
 /**
  * Plugin that queries the ModuleGraph to look for modules that correspond to
  * certain features (e.g. next/image and next/script) and record how many times
@@ -83,6 +88,9 @@ export class TelemetryPlugin implements webpack.WebpackPluginInstance {
     compiler.hooks.make.tapAsync(
       TelemetryPlugin.name,
       async (compilation: webpack.Compilation, callback: () => void) => {
+        compilation.hooks.afterCodeGeneration.tap(TelemetryPlugin.name, () => {
+          console.log(compilation.assets)
+        })
         compilation.hooks.finishModules.tapAsync(
           TelemetryPlugin.name,
           async (modules: Iterable<Module>, modulesFinish: () => void) => {
@@ -105,10 +113,22 @@ export class TelemetryPlugin implements webpack.WebpackPluginInstance {
         callback()
       }
     )
+    compiler.hooks.compilation.tap(TelemetryPlugin.name, (compilation) => {
+      const moduleHooks = NormalModule.getCompilationHooks(compilation)
+      moduleHooks.loader.tap(TelemetryPlugin.name, (loaderContext: any) => {
+        loaderContext.eliminatedPackages = ELIMINATED_PACKAGES
+      })
+    })
   }
 
   usages(): FeatureUsage[] {
     return [...this.usageTracker.values()]
+  }
+
+  packagesUsedInServerSideProps(): { package: string }[] {
+    return Array.from(new Set(ELIMINATED_PACKAGES)).map((pkg) => ({
+      package: pkg,
+    }))
   }
 }
 

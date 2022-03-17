@@ -1,3 +1,5 @@
+import React from 'react'
+
 export default function Index({ time }) {
   return (
     <main>
@@ -12,6 +14,7 @@ export async function getServerSideProps({ req, res }) {
     'Cache-Control',
     'public, s-maxage=10, stale-while-revalidate=59'
   )
+  res.setHeader('x-react-version', React.version)
 
   return {
     props: {
